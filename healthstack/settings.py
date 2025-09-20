@@ -37,9 +37,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env('DEBUG', default=False)
 
-ALLOWED_HOSTS = ['192.168.0.100', '127.0.0.1', 'localhost', '5749-103-109-53-5.in.ngrok.io','.trycloudflare.com']
+ALLOWED_HOSTS = ['192.168.0.100', '127.0.0.1', 'localhost', '5749-103-109-53-5.in.ngrok.io','.trycloudflare.com', '.onrender.com']
 # ALLOWED_HOSTS = ['mobile view', 'local host','ngrok -- keeps on changing']
 
 # Application definition
@@ -74,6 +74,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
+
+# Add WhiteNoise middleware only in production
+if not DEBUG:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 INTERNAL_IPS = [
     "127.0.0.1",
@@ -112,6 +116,15 @@ DATABASES = {
     }
 }
 
+# Production database configuration (PostgreSQL for Render.com)
+if 'DATABASE_URL' in os.environ:
+    try:
+        import dj_database_url
+        DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
+    except ImportError:
+        # dj_database_url not installed, will use default SQLite
+        pass
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
@@ -148,6 +161,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/images/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'static/images')
@@ -155,6 +169,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'static/images')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static')
 ]
+
+# WhiteNoise configuration for static files (production only)
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 ### SSLCOMMERZ env variables
 #VARIABLE should be in capital letter.
@@ -211,3 +229,22 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 # Additional email SSL settings
 EMAIL_SSL_CONTEXT = unverified_context
+
+# Production Security Settings
+if not DEBUG:
+    # Security settings for production
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_REDIRECT_EXEMPT = []
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_TZ = True
+    
+    # Session security
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # Additional security headers
+    X_FRAME_OPTIONS = 'DENY'
